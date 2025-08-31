@@ -1,0 +1,179 @@
+---
+title: "Predicting Apple’s stock direction and price."
+author: "Ha Doan, Ha Pham"
+output: pdf_document
+---
+
+I. Project Description: 
+
+In this project, we are focusing on researching how Apple’s stock has changed overtime. Based on the trends, we hope we can forecast its stock directions and prices in the future. We use data about the Adj Close of Apple Stock from 1/1/1985 to 4/1/2023. As we only focus on studying the trend of Apple’s stock, we do not need to have access to any additional data besides the historical stock prices. Therefore, we will be using time series analysis techniques to analyze the data and make predictions for the future price. We will try to forecast Apple stock price using time series specifically, Arima and Holt-Winters forecasting method and comparing it to a traditional financial DCF model in order to see which is the best model to predict. By the end of the project, we hope to gain insights into the company's performance, identify key factors that affect its stock price, and provide a reliable forecast for the future direction of the stock.
+
+II. Project Data Exploration:
+
+1. Holt-Winter's model
+
+In this project, we began by collecting data on the Adj. Close of Apple stock from 1/1/1985 to 4/1/2023. We then used time series analysis to examine how Apple's stock has performed over time and created a plot to visualize the data. We decomposed the plot to identify other factors such as trends and residuals that may have affected the model. First we intergrated these libraries into our model:
+
+```{r}
+library(zoo)
+library(forecast)
+library(ggplot2)
+```
+
+Reading the apple's historical stock price from the csv file and name it app.df
+```{r}
+stk.df <- read.csv("AAPL.csv")
+stk.vec <- stk.df$Adj.Close
+summary(stk.vec)
+```
+
+Creating a time series vector and called it app.ts using the ts function with the data equal to the timeline of the data 
+
+```{r}
+stk.ts <- ts(data = stk.vec, start = c(1985,01), frequency = 12)
+```
+
+Plotting the time series for a better visual input:
+
+```{r}
+plot(stk.ts)
+```
+
+Non-stationary or stationary?
+
+> This is a non-stationary graph which we can see that the is an exponentially increase from 2010
+
+Using decompose function to plot out the noise component of the series
+```{r}
+stk.ts.comp <- decompose(stk.ts)
+plot(stk.ts.comp)
+```
+
+Distribution of the noise component? Is there a trend? If we to follow that trend what is the stock direction?
+
+> The more the stock growth overtime the more noises are recored in the model as the company's stock is traded way above the intrinsic value making become very volitile with the general market. The trend of the stock shown that it will continuously increase in the future.
+
+
+Create training and testing data set by 80-20%
+
+```{r}
+train.data <- ts(data = stk.vec, start = c(1985,01), end = c(2020,01), frequency = 12)
+test.data  <- ts(data = stk.vec, start = c(2020,02), end = c(2023,02), frequency = 12)
+```
+
+Fit a Holt-Winters triple exponential model to the training data. Using hw function and passed it through the train.data data frame and set h to a accurate number of months that are used in the training data set. Set the name for the model to be apple.hw
+
+```{r}
+hw.fit <- hw(train.data, h= 21)
+plot(hw.fit)
+```
+
+Checking hw model residuals by passing apple.hw through checkresiduals function.
+
+```{r}
+hw.check <- checkresiduals(hw.fit)
+```
+
+Is the residual normally distributed? What is the Ljung-Box test says about the model?
+
+> Yes the model is normally distributed. According to Ljung-Box test, since p-value is very small, we reject the null hypothesis that the stock the remain the same and continously to increase overtime.
+
+
+2. Using Auto-regressive model or arima
+
+fitting the arima model with the train data set
+
+```{r}
+arima.fit <- auto.arima(train.data)
+arima.check <- checkresiduals(arima.fit)
+```
+Is the residual normally distributed? What is the test say?
+
+> Yes the model is normally distributed. According to Ljung-Box test, since p-value is very small, we reject the null hypothesis that the stock the remain the same and continously to increase overtime. 
+
+Call the forecast function to predict the trend of apple stock price
+
+``` {r}
+arima.pred <- forecast(arima.fit, h=21)
+plot(arima.pred)
+```
+
+Checking the accuracy of the two models
+
+```{r}
+accuracy(hw.fit, test.data)
+accuracy(arima.pred, test.data)
+```
+How is the prediction set visually 
+
+> Overall the two models works really well in predicting the direction of Apple stock in the year 2022 onwards. The overall Errors are expected to be relatively high since we are using data from the 1980s to 2022 as the train data set.
+
+III. Data Prediction using hw and Arima and parallelly compared with Discounted Cash Flow Model
+
+We will dive deeper into the data set by looking specifically at the data from 2010-2021 to predict the future stock price of AAPL.
+
+Setting up training and testing data:
+
+```{r}
+train1.data <- ts(data = stk.vec, start = c(2010,01), end = c(2021,12), frequency = 12)
+test1.data  <- ts(data = stk.vec, start = c(2022,01), end = c(2023,02), frequency = 12)
+```
+
+1. Using Holt-Winter's model
+
+```{r}
+hw1.fit <- hw(train1.data, h= 21)
+plot(hw1.fit)
+```
+
+Checking residual
+```{r}
+hw1.check <- checkresiduals(hw1.fit)
+```
+
+2. Using Arima's model
+```{r}
+arima.fit1 <- auto.arima(train1.data)
+arima.check1 <- checkresiduals(arima.fit1)
+```
+
+check residual
+```{r}
+arima.pred1 <- forecast(arima.fit1, h=21)
+plot(arima.pred1)
+```
+
+3. Using DCF as the model for valuation
+
+Checking DCF residuals
+
+```{r}
+dcf.vec <- c(139.28, 139.76, 140.23, 140.71, 141.19, 141.67, 142.15, 142.62, 143.10, 143.58, 144.06, 144.53, 145.09, 145.65)
+
+dcf.values <- ts(data = dcf.vec, start = c(2022,01), end = c(2023,02), frequency = 12)
+
+plot(dcf.values)
+dcf.check <- checkresiduals(dcf.values)
+```
+Since our DCF model always assume a constant growth of Unleverd Free Cash Flow which directly result in the increase in price per share of apple stock. It is clear that it is expected to resemble a linear regression
+
+```{r}
+accuracy(hw1.fit, test1.data)
+accuracy(arima.pred1, test1.data)
+accuracy(dcf.values, test1.data)
+```
+
+From the accuracy test, it is clear that Arima has the least Measured Square Error compared to other 2 models. However, it is capability of predicting apple stock price is still uncertain since it fail to mimic the volatility of AAPL overtime.
+
+
+IV. Conclusion
+
+It is very surprising that both time series models (Hotl Winter and Arima) in their own unique way better than the tranditional DCF modeling from finance.
+
+Hotl Winter's model tried to grasp a certain patterns of the AAPL by using the given data's noises which result in the lowest p-value with the Ljung-Box test and admirable predicting graph patterns. However, it still lacks its accountability in actual values measured Errors. This model particularly is really good at predicting stock's momentum within the market.
+
+Arima model has no particular pattern recognition, however, it offers the least Measured Errors compared to the other two models. With the Ljung-Box test we also find out that it has the highest residuals with p-value = 0.03.
+
+Finally, the DCF model substantially undervalue the Apple's stock price. This happens due the fact that this model from the financial system actually took into consideration Apple's core values like revenue, cost, interest rate, and tax rate. The model also assume that the company Free Cash Flow from Operation is a constant increase overtime which result in linear liked regression resemble the Apple's intrinsic values. Thus, result in a much lower values predicted for AAPL making the model to be the highest in measured Square Errors. This model shown the actual value of the stock instead of the inflated over-value current price of Apple.
+
+In conclusion, when it comes to determine stock price, each models have their own unique capabilities to offer. However, Holt Winter's model and DCF model seems to be more incapable of projecting apple's stock prices. In practical usage, Holt Winter's model can welly formulate the momentum of apple stock price while parallelly compare with the intrinsic values from the DCF models. However, in reality, these model might only can works particularly with Apple's stock which are not applicable to any scenarios.
